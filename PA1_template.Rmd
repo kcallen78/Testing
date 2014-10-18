@@ -1,0 +1,138 @@
+Kirk Allen
+coursera Reproducible Research (Oct 2014)
+Peer assignment #1
+========================================================
+
+Good morning, good afternoon, and good night. 
+
+Let's get started.
+
+Load package 'lattice' for plot at the end
+```{r}
+library(lattice)  # for the plot towards the end
+```
+
+Set local directory
+```{r}
+localdir = "H:\\Downloads"
+setwd(localdir)
+```
+
+Download zip from URL, Unzip the file, and load it into data frame activity.data
+```{r}
+url <- "http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(url, "repdata-data-activity.zip", mode="wb")
+activity.zip=unzip("repdata-data-activity.zip")
+activity.data = read.csv(activity.zip)
+```
+
+Define new data frame where NAs are eliminated. Check the dimensions of original and new data.
+```{r}
+activity.data.noNA = activity.data[!is.na(activity.data$steps),]
+dim(activity.data)
+dim(activity.data.noNA)
+```
+
+Sum the number of steps for each date. 
+```{r}
+daily.steps = aggregate(steps ~ date, data=activity.data.noNA, FUN=sum)
+```
+
+See mean and median daily steps
+```{r}
+mean(daily.steps$steps)
+median(daily.steps$steps)
+```
+
+Make a histogram of daily steps
+```{r}
+hist(daily.steps$steps)
+```
+
+Average daily activity pattern: 1. Calculate mean no. of steps per 5 minute period; 2. plot time series.
+```{r}
+interval.steps = aggregate(steps ~ interval, data=activity.data.noNA, FUN=mean)
+plot(interval.steps$interval,interval.steps$steps,type="l")
+```
+
+Interval with the most steps: 835 (maybe this person walks to work at same time every day?)
+```{r}
+interval.steps[interval.steps$steps==max(interval.steps$steps),]$interval
+```
+
+
+Now work on imputings NAs in original data.
+First check how many NAs there are:
+```{r}
+dim(activity.data)[1] - dim(activity.data.noNA)[1]
+```
+
+Now make a data frame with only the NA rows. And check that is has same number of rows as the previous command:
+```{r}
+activity.data.NA = activity.data[is.na(activity.data$steps),]
+dim(activity.data.NA)[1]  
+```
+
+Remove the column named steps (because we will replace/impute it )
+```{r}
+activity.data.NA = activity.data.NA[,-which(names(activity.data.NA)=="steps")]  
+```
+
+Merge NA rows with average steps by interval (data interval.steps above)
+This means imputation by replacing NA with average for that interval
+```{r}
+activity.data.NA.impute = merge(activity.data.NA,interval.steps,by="interval")
+```
+
+Combine rows from imputed NAs with non-NA rows
+```{r}
+activity.data.imputed = rbind(activity.data.noNA,activity.data.NA.impute)
+```
+
+Sum by date and make histogram.
+```{r}
+daily.steps.imp = aggregate(steps ~ date, data=activity.data.imputed , FUN=sum)
+hist(daily.steps.imp$steps)
+```
+
+Check mean and median on imputed dataset. 
+```{r}
+mean(daily.steps.imp$steps)    
+median(daily.steps.imp$steps)  
+```
+
+Seems that 8 days are entirely missing, so replacing with mean will not change mean
+```{r}
+table(activity.data.NA$interval)
+table(activity.data.NA$date)
+```
+
+Now check weekdays vs. weekends. (For some reason my R language is French, so need to check for french version of Saturday & Sunday also!)
+```{r}
+activity.data.imputed$dayofweek = weekdays(as.Date(activity.data.imputed$date))
+
+# define "weekend" column = 0 Mon-Fri and = 1 Sat&Sun
+activity.data.imputed$weekend = "weekday"
+activity.data.imputed[activity.data.imputed$dayofweek %in% c("Saturday","Sunday","samedi","dimanche"),]$weekend = "weekend"
+
+```
+
+
+Check the new variable weekend.
+```{r}
+table(activity.data.imputed$weekend)
+table(activity.data.imputed$weekend,activity.data.imputed$dayofweek)
+```
+
+Take mean for each interval stratified by weekend variable.
+```{r}
+weekend.intervals=aggregate(steps~weekend*interval*steps,data=activity.data.imputed,FUN=mean)
+```
+
+Make a panel plot (lattice package). Weekday steps are more peaked early in the morning (walking to work?), while weekend is more evenly spread throughout the day.
+```{r}
+xyplot(steps~interval|weekend,data=weekend.intervals,type="l",layout=c(1,2))
+```
+
+
+
